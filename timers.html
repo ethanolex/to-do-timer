@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Timer</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --primary-light: #5d8bd3;
+            --background: #f8f9fa;
+            --card: #ffffff;
+            --text: #333333;
+            --text-light: #666666;
+            --danger: #e74c3c;
+            --danger-light: #f27a6e;
+            --border: #e0e0e0;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 70px;
+            --transition-speed: 0.3s;
+            --success: #27ae60;
+        }
+
+        .dark-mode {
+            --background: #121212;
+            --card: #1e1e1e;
+            --text: #e0e0e0;
+            --text-light: #aaaaaa;
+            --border: #333333;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar styles */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: var(--sidebar-width);
+            background-color: var(--card);
+            box-shadow: 0 4px 6px var(--shadow);
+            z-index: 1000;
+            transition: all var(--transition-speed) ease;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            min-height: 60px;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity var(--transition-speed) ease;
+            margin-right: 10px;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .collapse-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-speed) ease;
+            flex-shrink: 0;
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+        }
+
+        .collapse-btn:hover {
+            background-color: var(--primary-light);
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .collapse-btn svg {
+            transition: transform var(--transition-speed) ease;
+        }
+
+        .sidebar.collapsed .collapse-btn svg {
+            transform: rotate(180deg);
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-item {
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-item:hover {
+            background-color: var(--background);
+        }
+
+        .nav-item.active {
+            background-color: var(--background);
+            border-left: 3px solid var(--primary);
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 1rem;
+            min-width: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-text {
+            font-size: 0.95rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            opacity: 1;
+            transition: opacity var(--transition-speed) ease;
+        }
+
+        .sidebar.collapsed .nav-text {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            transition: margin-left var(--transition-speed) ease;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .main-content.sidebar-collapsed {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .mode-toggle-container {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mode-toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .mode-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .mode-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .mode-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .mode-toggle-slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .mode-toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .mode-label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .total-time {
+            background-color: var(--card);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .total-time-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 0.3rem;
+        }
+
+        .total-time-value {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        .daily-reset-notice {
+            background-color: var(--success);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .task-form {
+            display: flex;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: var(--card);
+            box-shadow: 0 4px 6px var(--shadow);
+        }
+
+        .task-input {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            background-color: transparent;
+            color: var(--text);
+        }
+
+        .add-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 1rem;
+        }
+
+        .add-btn:hover {
+            background-color: var(--primary-light);
+        }
+
+        .tasks-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .task {
+            background-color: var(--card);
+            padding: 1.2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .task:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+
+        .task-info {
+            flex: 1;
+        }
+
+        .task-name {
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: var(--text);
+        }
+
+        .task-time {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .task-controls {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+        }
+
+        .timer-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: var(--background);
+        }
+
+        .timer-btn.play {
+            color: var(--primary);
+        }
+
+        .timer-btn.pause {
+            color: var(--primary);
+        }
+
+        .timer-btn.reset {
+            color: var(--primary);
+        }
+
+        .timer-btn.delete {
+            color: var(--danger);
+        }
+
+        .timer-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-light);
+            padding: 3rem 1rem;
+            border-radius: 8px;
+            background-color: var(--card);
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .empty-state p {
+            margin-bottom: 1rem;
+        }
+
+        /* Full screen task mode */
+        .fullscreen-task {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--background);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        .fullscreen-task h2 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: var(--text);
+            max-width: 90%;
+        }
+
+        .fullscreen-time {
+            font-size: 5rem;
+            font-weight: 300;
+            color: var(--primary);
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        .fullscreen-controls {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .fullscreen-btn {
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 120px;
+        }
+
+        .fullscreen-btn.play {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .fullscreen-btn.pause {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .fullscreen-btn.reset {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .fullscreen-btn.stop {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .fullscreen-btn.exit {
+            background-color: var(--border);
+            color: var(--text);
+        }
+
+        .fullscreen-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+
+        /* True full screen mode */
+        .true-fullscreen {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                left: calc(var(--sidebar-width) * -1);
+                z-index: 1001;
+            }
+            
+            .sidebar.mobile-open {
+                left: 0;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            
+            .mobile-menu-btn {
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background-color: var(--primary);
+                color: white;
+                border: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                z-index: 1002;
+                box-shadow: 0 2px 4px var(--shadow);
+            }
+            
+            .overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1001;
+                display: none;
+            }
+            
+            .overlay.active {
+                display: block;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .total-time-value {
+                font-size: 1.2rem;
+            }
+            
+            .fullscreen-task h2 {
+                font-size: 2rem;
+            }
+            
+            .fullscreen-time {
+                font-size: 3.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile menu button for small screens -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+
+    <!-- Overlay for mobile menu -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">Focus Timer</span>
+            <button class="collapse-btn" id="collapseBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item active" data-page="timer">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <span class="nav-text">Timer</span>
+            </li>
+            <li class="nav-item" data-page="analytics">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="2" y1="20" x2="22" y2="20"></line></svg>
+                </div>
+                <span class="nav-text">Analytics</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content" id="mainContent">
+        <div class="container">
+            <header>
+                <h1>Focus Timer</h1>
+                <p class="subtitle">剩下的只能靠着自己的努力</p>
+                <div class="mode-toggle-container">
+                    <span class="mode-label">Light</span>
+                    <label class="mode-toggle">
+                        <input type="checkbox" id="modeToggle">
+                        <span class="mode-toggle-slider"></span>
+                    </label>
+                    <span class="mode-label">Dark</span>
+                </div>
+            </header>
+
+            <div class="daily-reset-notice" id="dailyResetNotice">
+                ✨ New day! Yesterday's data has been archived. ✨
+            </div>
+
+            <div class="total-time">
+                <div class="total-time-label">Today's Total Time</div>
+                <div class="total-time-value" id="totalTime">Loading...</div>
+            </div>
+
+            <form class="task-form">
+                <input type="text" class="task-input" placeholder="Add a new task..." required>
+                <button type="submit" class="add-btn">Add</button>
+            </form>
+
+            <div class="tasks-container" id="tasksContainer">
+                <div class="loading">Loading your tasks...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full screen task display -->
+    <div class="fullscreen-task" id="fullscreenTask" style="display: none;">
+        <h2 id="fullscreenTaskName">Task Name</h2>
+        <div class="fullscreen-time" id="fullscreenTime">0s</div>
+        <div class="fullscreen-controls">
+            <button class="fullscreen-btn" id="fullscreenToggle">Start</button>
+            <button class="fullscreen-btn reset" id="fullscreenReset">Reset</button>
+            <button class="fullscreen-btn exit" id="fullscreenExit">Exit</button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration - REPLACE WITH YOUR OWN CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "********",
+            authDomain: "********",
+            projectId: "********",
+            storageBucket: "********",
+            messagingSenderId: "********",
+            appId: "********",
+            measurementId: "********"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const tasksCollection = db.collection('tasks');
+        const dailyLogsCollection = db.collection('dailyLogs');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const collapseBtn = document.getElementById('collapseBtn');
+            const navItems = document.querySelectorAll('.nav-item');
+            const taskForm = document.querySelector('.task-form');
+            const taskInput = document.querySelector('.task-input');
+            const tasksContainer = document.getElementById('tasksContainer');
+            const totalTimeElement = document.getElementById('totalTime');
+            const modeToggle = document.getElementById('modeToggle');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const overlay = document.getElementById('overlay');
+            const dailyResetNotice = document.getElementById('dailyResetNotice');
+            
+            // Full screen elements
+            const fullscreenTask = document.getElementById('fullscreenTask');
+            const fullscreenTaskName = document.getElementById('fullscreenTaskName');
+            const fullscreenTime = document.getElementById('fullscreenTime');
+            const fullscreenToggle = document.getElementById('fullscreenToggle');
+            const fullscreenReset = document.getElementById('fullscreenReset');
+            const fullscreenExit = document.getElementById('fullscreenExit');
+            
+            // Store tasks and their timers
+            let tasks = [];
+            let timers = {};
+            let currentFullscreenTaskId = null;
+            let isLoading = true;
+            
+            // Check if we're on mobile
+            const isMobile = window.innerWidth <= 768;
+            
+            // Update mobile view based on screen size
+            function updateMobileView() {
+                if (window.innerWidth <= 768) {
+                    mobileMenuBtn.style.display = 'flex';
+                    sidebar.classList.remove('collapsed');
+                    sidebar.style.left = `calc(var(--sidebar-width) * -1)`;
+                } else {
+                    mobileMenuBtn.style.display = 'none';
+                    overlay.style.display = 'none';
+                    sidebar.style.display = 'block';
+                    sidebar.style.left = '0';
+                    
+                    // Apply collapsed state based on saved preference or default
+                    const savedCollapsed = localStorage.getItem('sidebarCollapsed');
+                    if (savedCollapsed === 'true') {
+                        sidebar.classList.add('collapsed');
+                        mainContent.classList.add('sidebar-collapsed');
+                    } else {
+                        sidebar.classList.remove('collapsed');
+                        mainContent.classList.remove('sidebar-collapsed');
+                    }
+                }
+            }
+            
+            // Initialize view based on screen size
+            updateMobileView();
+            
+            // Handle resize events
+            window.addEventListener('resize', updateMobileView);
+
+            // Check for saved theme preference
+            const savedMode = localStorage.getItem('darkMode');
+            if (savedMode === 'true') {
+                document.body.classList.add('dark-mode');
+                modeToggle.checked = true;
+            }
+            
+            // Initialize the app
+            loadTasksFromFirestore();
+            
+            // Add new task
+            taskForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const taskName = taskInput.value.trim();
+                if (taskName && !isLoading) {
+                    addTask(taskName);
+                    taskInput.value = '';
+                }
+            });
+            
+            // Theme toggle
+            modeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('darkMode', 'true');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('darkMode', 'false');
+                }
+            });
+            
+            // Sidebar collapse/expand functionality
+            collapseBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('sidebar-collapsed');
+                
+                // Save collapsed state
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            });
+            
+            // Mobile menu functionality
+            mobileMenuBtn.addEventListener('click', function() {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+            });
+            
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+            });
+            
+            // Navigation functionality
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const page = this.getAttribute('data-page');
+                    
+                    // Close mobile menu if open
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                    
+                    if (page === 'timer') {
+                        // Make sure timer nav item is active
+                        navItems[0].classList.add('active');
+                        navItems[1].classList.remove('active');
+                    } else if (page === 'analytics') {
+                        // Navigate to analytics page
+                        navItems[1].classList.add('active');
+                        navItems[0].classList.remove('active');
+                        
+                        // Redirect to analytics.html
+                        window.location.href = 'analytics.html';
+                    }
+                });
+            });
+            
+            // Full screen functionality
+            fullscreenToggle.addEventListener('click', function() {
+                if (!currentFullscreenTaskId) return;
+                
+                const task = tasks.find(t => t.id === currentFullscreenTaskId);
+                if (!task) return;
+                
+                toggleTimer(currentFullscreenTaskId);
+                
+                // Update button text
+                this.textContent = task.isRunning ? 'Pause' : 'Start';
+            });
+            
+            fullscreenReset.addEventListener('click', function() {
+                if (!currentFullscreenTaskId) return;
+                
+                if (confirm('Are you sure you want to reset this task timer?')) {
+                    resetTimer(currentFullscreenTaskId);
+                }
+            });
+            
+            fullscreenExit.addEventListener('click', function() {
+                exitFullscreenMode();
+            });
+            
+            // Listen for fullscreen change events
+            document.addEventListener('fullscreenchange', function() {
+                if (!document.fullscreenElement) {
+                    // Exit our fullscreen mode when user exits with ESC
+                    exitFullscreenMode();
+                }
+            });
+            
+            // ============ DAILY RESET AND ARCHIVE FUNCTIONALITY ============
+            
+            async function archiveYesterdayData() {
+                const now = new Date();
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().slice(0, 10);
+                const todayStr = now.toISOString().slice(0, 10);
+                
+                try {
+                    // Check if we already archived today
+                    const existingLog = await dailyLogsCollection.doc(yesterdayStr).get();
+                    if (existingLog.exists) {
+                        console.log('Already archived for', yesterdayStr);
+                        localStorage.setItem('lastResetDate', todayStr);
+                        return false;
+                    }
+                    
+                    // Get all tasks
+                    const tasksSnapshot = await tasksCollection.get();
+                    
+                    if (tasksSnapshot.empty) {
+                        localStorage.setItem('lastResetDate', todayStr);
+                        return false;
+                    }
+                    
+                    // Prepare daily log
+                    const dailyLog = {
+                        date: yesterdayStr,
+                        tasks: {},
+                        totalSeconds: 0,
+                        archivedAt: new Date().toISOString()
+                    };
+                    
+                    const batch = db.batch();
+                    
+                    tasksSnapshot.forEach(doc => {
+                        const task = doc.data();
+                        const currentTime = task.time || 0;
+                        
+                        if (currentTime > 0) {
+                            dailyLog.tasks[doc.id] = {
+                                name: task.name,
+                                time: currentTime
+                            };
+                            dailyLog.totalSeconds += currentTime;
+                        }
+                        
+                        // Reset time to 0
+                        batch.update(doc.ref, { time: 0 });
+                    });
+                    
+                    // Save to dailyLogs if there was activity
+                    if (dailyLog.totalSeconds > 0) {
+                        const logRef = dailyLogsCollection.doc(yesterdayStr);
+                        batch.set(logRef, dailyLog);
+                        console.log(`Archived ${dailyLog.totalSeconds} seconds for ${yesterdayStr}`);
+                    }
+                    
+                    // Commit all changes
+                    await batch.commit();
+                    
+                    // Update last reset date
+                    localStorage.setItem('lastResetDate', todayStr);
+                    
+                    // Show notice to user
+                    dailyResetNotice.style.display = 'block';
+                    setTimeout(() => {
+                        dailyResetNotice.style.display = 'none';
+                    }, 5000);
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error archiving daily data:', error);
+                    return false;
+                }
+            }
+            
+            async function checkAndResetDay() {
+                const now = new Date();
+                const todayStr = now.toISOString().slice(0, 10);
+                const lastResetDate = localStorage.getItem('lastResetDate');
+                
+                // If we haven't reset today, do it now
+                if (lastResetDate !== todayStr) {
+                    console.log('New day detected! Archiving yesterday...');
+                    const archived = await archiveYesterdayData();
+                    
+                    if (archived) {
+                        // Reload tasks to show reset values
+                        await loadTasksFromFirestore();
+                    } else {
+                        localStorage.setItem('lastResetDate', todayStr);
+                    }
+                }
+            }
+            
+            // Modified loadTasksFromFirestore to handle daily reset
+            async function loadTasksFromFirestore() {
+                try {
+                    // First check if we need to reset for a new day
+                    await checkAndResetDay();
+                    
+                    // Show loading state
+                    totalTimeElement.textContent = 'Loading...';
+                    tasksContainer.innerHTML = '<div class="loading">Loading your tasks...</div>';
+                    isLoading = true;
+                    
+                    // Get tasks from Firestore
+                    const snapshot = await tasksCollection.get();
+                    tasks = [];
+                    
+                    snapshot.forEach(doc => {
+                        const task = doc.data();
+                        task.id = doc.id;
+                        tasks.push(task);
+                    });
+                    
+                    // Initialize the UI
+                    renderTasks();
+                    startSavedTimers();
+                    updateTotalTime();
+                    
+                    isLoading = false;
+                    
+                    // Set up real-time listener for future changes
+                    setupRealTimeListener();
+                } catch (error) {
+                    console.error("Error loading tasks:", error);
+                    tasksContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>Error loading tasks. Please try again later.</p>
+                            <p style="font-size: 0.8rem; margin-top: 0.5rem;">${error.message}</p>
+                        </div>
+                    `;
+                    totalTimeElement.textContent = 'Error';
+                    isLoading = false;
+                }
+            }
+            
+            function setupRealTimeListener() {
+                // Listen for real-time updates
+                tasksCollection.onSnapshot(snapshot => {
+                    // Only update if we're not currently loading
+                    if (!isLoading) {
+                        const updatedTasks = [];
+                        
+                        snapshot.forEach(doc => {
+                            const task = doc.data();
+                            task.id = doc.id;
+                            updatedTasks.push(task);
+                        });
+                        
+                        // Preserve running timers
+                        const runningTaskIds = new Set();
+                        Object.keys(timers).forEach(id => {
+                            if (timers[id]) {
+                                runningTaskIds.add(id);
+                            }
+                        });
+                        
+                        tasks = updatedTasks;
+                        
+                        // Restart timers for running tasks
+                        Object.keys(timers).forEach(id => {
+                            if (timers[id]) {
+                                clearInterval(timers[id]);
+                            }
+                        });
+                        timers = {};
+                        
+                        startSavedTimers();
+                        renderTasks();
+                        updateTotalTime();
+                    }
+                }, error => {
+                    console.error("Error in real-time listener:", error);
+                });
+            }
+            
+            async function addTask(name) {
+                try {
+                    const taskData = {
+                        name: name,
+                        time: 0,
+                        isRunning: false,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    const docRef = await tasksCollection.add(taskData);
+                    taskData.id = docRef.id;
+                    
+                    tasks.push(taskData);
+                    
+                    // No need to re-render here as the real-time listener will trigger
+                    updateTotalTime();
+                } catch (error) {
+                    console.error("Error adding task:", error);
+                    alert("Failed to add task. Please try again.");
+                }
+            }
+            
+            async function deleteTask(id) {
+                // Clear the timer if it's running
+                if (timers[id]) {
+                    clearInterval(timers[id]);
+                    delete timers[id];
+                }
+                
+                try {
+                    await tasksCollection.doc(id).delete();
+                    
+                    // The real-time listener will handle the UI update
+                    if (currentFullscreenTaskId === id) {
+                        exitFullscreenMode();
+                    }
+                } catch (error) {
+                    console.error("Error deleting task:", error);
+                    alert("Failed to delete task. Please try again.");
+                }
+            }
+            
+            async function resetTimer(id) {
+                const task = tasks.find(t => t.id === id);
+                if (!task) return;
+                
+                // Clear the timer if it's running
+                if (timers[id]) {
+                    clearInterval(timers[id]);
+                    delete timers[id];
+                }
+                
+                // Reset the task time and state
+                task.time = 0;
+                task.isRunning = false;
+                
+                // Update Firestore
+                try {
+                    await tasksCollection.doc(id).update({
+                        time: 0,
+                        isRunning: false
+                    });
+                    
+                    // Update the display
+                    const taskElement = document.querySelector(`[data-id="${id}"]`);
+                    if (taskElement) {
+                        const timeElement = taskElement.querySelector('.task-time');
+                        timeElement.textContent = '0s';
+                    }
+                    
+                    // Update fullscreen display if this task is in fullscreen
+                    if (currentFullscreenTaskId === id) {
+                        fullscreenTime.textContent = '0s';
+                        fullscreenToggle.textContent = 'Start';
+                    }
+                    
+                    // Update total time
+                    updateTotalTime();
+                    
+                    // Re-render to update button states
+                    renderTasks();
+                } catch (error) {
+                    console.error("Error resetting task:", error);
+                    alert("Failed to reset task. Please try again.");
+                }
+            }
+            
+            async function toggleTimer(id) {
+                const task = tasks.find(t => t.id === id);
+                if (!task) return;
+                
+                // Update the isRunning status in our local copy
+                task.isRunning = !task.isRunning;
+                
+                if (task.isRunning) {
+                    // Start the timer
+                    const startTime = Date.now() - (task.time * 1000);
+                    
+                    timers[id] = setInterval(() => {
+                        const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                        const taskElement = document.querySelector(`[data-id="${id}"]`);
+                        if (taskElement) {
+                            const timeElement = taskElement.querySelector('.task-time');
+                            timeElement.textContent = formatTime(elapsedTime);
+                        }
+                        
+                        // Update fullscreen display if this task is in fullscreen
+                        if (currentFullscreenTaskId === id) {
+                            fullscreenTime.textContent = formatTime(elapsedTime);
+                        }
+                    }, 1000);
+                } else {
+                    // Stop the timer
+                    if (timers[id]) {
+                        clearInterval(timers[id]);
+                        delete timers[id];
+                    }
+                    
+                    // Update the stored time in our local copy
+                    const taskElement = document.querySelector(`[data-id="${id}"]`);
+                    if (taskElement) {
+                        const timeText = taskElement.querySelector('.task-time').textContent;
+                        const seconds = parseTimeToSeconds(timeText);
+                        task.time = seconds;
+                    }
+                }
+                
+                // Update Firestore with the new state
+                try {
+                    await tasksCollection.doc(id).update({
+                        isRunning: task.isRunning,
+                        time: task.time
+                    });
+                } catch (error) {
+                    console.error("Error updating task in Firestore:", error);
+                    // If update fails, revert the local change
+                    task.isRunning = !task.isRunning;
+                    renderTasks();
+                    throw error;
+                }
+                
+                // Update UI
+                renderTasks();
+                updateTotalTime();
+            }
+            
+            function enterFullscreenMode(taskId) {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+                
+                currentFullscreenTaskId = taskId;
+                
+                // Set task name
+                fullscreenTaskName.textContent = task.name;
+                
+                // Set initial time display
+                if (task.isRunning) {
+                    // If timer is running, show real-time updated value
+                    const now = Date.now();
+                    const startTime = now - (task.time * 1000);
+                    const currentElapsed = Math.floor((now - startTime) / 1000);
+                    fullscreenTime.textContent = formatTime(currentElapsed);
+                } else {
+                    fullscreenTime.textContent = formatTime(task.time);
+                }
+                
+                // Set button text
+                fullscreenToggle.textContent = task.isRunning ? 'Pause' : 'Start';
+                
+                // Show fullscreen mode
+                fullscreenTask.style.display = 'flex';
+                
+                // Request true fullscreen using the Full Screen API
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+                    });
+                } else if (document.documentElement.mozRequestFullScreen) { /* Firefox */
+                    document.documentElement.mozRequestFullScreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) { /* IE/Edge */
+                    document.documentElement.msRequestFullscreen();
+                }
+                
+                // Add a class to adjust styling for true fullscreen
+                document.body.classList.add('true-fullscreen');
+            }
+            
+            function exitFullscreenMode() {
+                // Exit fullscreen mode using the Full Screen API
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { /* Firefox */
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE/Edge */
+                    document.msExitFullscreen();
+                }
+                
+                // Hide our fullscreen display
+                fullscreenTask.style.display = 'none';
+                currentFullscreenTaskId = null;
+                
+                // Remove the fullscreen class
+                document.body.classList.remove('true-fullscreen');
+            }
+            
+            function formatTime(totalSeconds) {
+                // Handle edge case for undefined or NaN
+                if (!totalSeconds || isNaN(totalSeconds) || totalSeconds < 0) {
+                    return '0s';
+                }
+                
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = Math.floor(totalSeconds % 60);
+                
+                if (hours > 0) {
+                    return `${hours}h ${minutes}m ${seconds}s`;
+                } else if (minutes > 0) {
+                    return `${minutes}m ${seconds}s`;
+                } else {
+                    return `${seconds}s`;
+                }
+            }
+            
+            function parseTimeToSeconds(timeString) {
+                if (!timeString) return 0;
+                
+                const hourMatch = timeString.match(/(\d+)h/);
+                const minuteMatch = timeString.match(/(\d+)m/);
+                const secondMatch = timeString.match(/(\d+)s/);
+                
+                const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+                const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
+                const seconds = secondMatch ? parseInt(secondMatch[1]) : 0;
+                
+                return hours * 3600 + minutes * 60 + seconds;
+            }
+            
+            function renderTasks() {
+                if (tasks.length === 0) {
+                    tasksContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>No tasks yet. Add a task to get started!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                tasksContainer.innerHTML = '';
+                
+                tasks.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task';
+                    taskElement.setAttribute('data-id', task.id);
+                    taskElement.style.cursor = 'pointer'; // Indicate it's clickable
+                    
+                    // Calculate display time
+                    let displayTime;
+                    if (task.isRunning) {
+                        // If timer is running, show real-time updated value
+                        const now = Date.now();
+                        const startTime = now - (task.time * 1000);
+                        const currentElapsed = Math.floor((now - startTime) / 1000);
+                        displayTime = formatTime(currentElapsed);
+                    } else {
+                        displayTime = formatTime(task.time);
+                    }
+                    
+                    taskElement.innerHTML = `
+                        <div class="task-info">
+                            <div class="task-name">${escapeHtml(task.name)}</div>
+                            <div class="task-time">${displayTime}</div>
+                        </div>
+                        <div class="task-controls">
+                            <button class="timer-btn ${task.isRunning ? 'pause' : 'play'}" 
+                                data-action="toggle" 
+                                title="${task.isRunning ? 'Pause' : 'Start'}">
+                                ${task.isRunning ? 
+                                    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' :
+                                    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>'
+                                }
+                            </button>
+                            <button class="timer-btn reset" data-action="reset" title="Reset">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.004"></path></svg>
+                            </button>
+                            <button class="timer-btn delete" data-action="delete" title="Delete">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Add click event to enter fullscreen mode
+                    taskElement.addEventListener('click', function(e) {
+                        // Only enter fullscreen if the click wasn't on a button
+                        if (!e.target.closest('.timer-btn')) {
+                            enterFullscreenMode(task.id);
+                        }
+                    });
+                    
+                    tasksContainer.appendChild(taskElement);
+                });
+                
+                // Add event listeners to the buttons
+                document.querySelectorAll('[data-action="toggle"]').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent triggering the task click
+                        const taskId = this.closest('.task').getAttribute('data-id');
+                        toggleTimer(taskId);
+                    });
+                });
+                
+                document.querySelectorAll('[data-action="reset"]').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent triggering the task click
+                        const taskId = this.closest('.task').getAttribute('data-id');
+                        if (confirm('Are you sure you want to reset this task timer?')) {
+                            resetTimer(taskId);
+                        }
+                    });
+                });
+                
+                document.querySelectorAll('[data-action="delete"]').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent triggering the task click
+                        const taskId = this.closest('.task').getAttribute('data-id');
+                        if (confirm('Are you sure you want to delete this task?')) {
+                            deleteTask(taskId);
+                        }
+                    });
+                });
+            }
+            
+            // Helper function to escape HTML
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            function startSavedTimers() {
+                // Clear any existing timers to prevent duplicates
+                Object.keys(timers).forEach(id => {
+                    clearInterval(timers[id]);
+                });
+                timers = {};
+                
+                // Start timers for running tasks
+                tasks.forEach(task => {
+                    if (task.isRunning) {
+                        const startTime = Date.now() - (task.time * 1000);
+                        
+                        timers[task.id] = setInterval(() => {
+                            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                            const taskElement = document.querySelector(`[data-id="${task.id}"]`);
+                            if (taskElement) {
+                                const timeElement = taskElement.querySelector('.task-time');
+                                timeElement.textContent = formatTime(elapsedTime);
+                            }
+                            
+                            // Update fullscreen display if this task is in fullscreen
+                            if (currentFullscreenTaskId === task.id) {
+                                fullscreenTime.textContent = formatTime(elapsedTime);
+                            }
+                        }, 1000);
+                    }
+                });
+            }
+            
+            function calculateTotalTime() {
+                let totalSeconds = 0;
+                
+                tasks.forEach(task => {
+                    if (task.isRunning && timers[task.id]) {
+                        // For running tasks, calculate current elapsed time
+                        const taskElement = document.querySelector(`[data-id="${task.id}"]`);
+                        if (taskElement) {
+                            const timeText = taskElement.querySelector('.task-time').textContent;
+                            totalSeconds += parseTimeToSeconds(timeText);
+                        } else {
+                            // Fallback: use stored time
+                            totalSeconds += task.time;
+                        }
+                    } else {
+                        // For stopped tasks, use stored time
+                        totalSeconds += task.time;
+                    }
+                });
+                
+                return totalSeconds;
+            }
+            
+            function updateTotalTime() {
+                const totalSeconds = calculateTotalTime();
+                totalTimeElement.textContent = formatTime(totalSeconds);
+            }
+            
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    // Save current states before tab is hidden
+                    Object.keys(timers).forEach(id => {
+                        const task = tasks.find(t => t.id === id);
+                        if (task && task.isRunning) {
+                            const taskElement = document.querySelector(`[data-id="${id}"]`);
+                            if (taskElement) {
+                                const timeText = taskElement.querySelector('.task-time').textContent;
+                                const seconds = parseTimeToSeconds(timeText);
+                                
+                                // Update Firestore with current time
+                                tasksCollection.doc(id).update({
+                                    time: seconds
+                                }).catch(error => {
+                                    console.error("Error saving time:", error);
+                                });
+                            }
+                        }
+                    });
+                } else if (document.visibilityState === 'visible') {
+                    // When tab becomes visible again, check for day change
+                    checkAndResetDay().then(() => {
+                        loadTasksFromFirestore();
+                    });
+                }
+            });
+            
+            // Also check for day change periodically (every 30 minutes)
+            setInterval(() => {
+                checkAndResetDay();
+            }, 1800000); // 30 minutes
+        });
+    </script>
+</body>
+</html>
