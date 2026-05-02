@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Focus Timer</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Date Range Picker -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --primary-light: #5d8bd3;
+            --primary-dark: #3a5a8a;
+            --background: #f8f9fa;
+            --card: #ffffff;
+            --text: #333333;
+            --text-light: #666666;
+            --danger: #e74c3c;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --border: #e0e0e0;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 70px;
+            --transition-speed: 0.3s;
+            /* Heatmap colors - GitHub style */
+            --heatmap-level0: #ebedf0;
+            --heatmap-level1: #9be9a8;
+            --heatmap-level2: #40c463;
+            --heatmap-level3: #30a14e;
+            --heatmap-level4: #216e39;
+        }
+
+        .dark-mode {
+            --background: #121212;
+            --card: #1e1e1e;
+            --text: #e0e0e0;
+            --text-light: #aaaaaa;
+            --border: #333333;
+            --shadow: rgba(0, 0, 0, 0.3);
+            /* Dark mode heatmap colors - GitHub dark style */
+            --heatmap-level0: #161b22;
+            --heatmap-level1: #0e4429;
+            --heatmap-level2: #006d32;
+            --heatmap-level3: #26a641;
+            --heatmap-level4: #39d353;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar styles */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: var(--sidebar-width);
+            background-color: var(--card);
+            box-shadow: 0 4px 6px var(--shadow);
+            z-index: 1000;
+            transition: all var(--transition-speed) ease;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            min-height: 60px;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity var(--transition-speed) ease;
+            margin-right: 10px;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .collapse-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-speed) ease;
+            flex-shrink: 0;
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+        }
+
+        .collapse-btn:hover {
+            background-color: var(--primary-light);
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .collapse-btn svg {
+            transition: transform var(--transition-speed) ease;
+        }
+
+        .sidebar.collapsed .collapse-btn svg {
+            transform: rotate(180deg);
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-item {
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-item:hover {
+            background-color: var(--background);
+        }
+
+        .nav-item.active {
+            background-color: var(--background);
+            border-left: 3px solid var(--primary);
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 1rem;
+            min-width: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-text {
+            font-size: 0.95rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            opacity: 1;
+            transition: opacity var(--transition-speed) ease;
+        }
+
+        .sidebar.collapsed .nav-text {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            transition: margin-left var(--transition-speed) ease;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .main-content.sidebar-collapsed {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .mode-toggle-container {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mode-toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .mode-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .mode-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .mode-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .mode-toggle-slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .mode-toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .mode-label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        /* Date Range Picker */
+        .daterange-container {
+            background-color: var(--card);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .date-range-selector {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .range-btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text);
+            transition: all 0.2s;
+        }
+
+        .range-btn:hover {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .range-btn.active {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        #daterange {
+            padding: 0.5rem 1rem;
+            background-color: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .export-btn {
+            padding: 0.5rem 1rem;
+            background-color: var(--success);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .stat-sub {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background-color: var(--card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+            border-bottom: 2px solid var(--primary);
+            display: inline-block;
+            padding-bottom: 0.3rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        canvas {
+            max-height: 300px;
+            width: 100%;
+        }
+
+        /* GitHub-style Heatmap */
+        .heatmap-wrapper {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        .heatmap-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        .heatmap-months {
+            display: flex;
+            margin-left: 30px;
+            margin-bottom: 10px;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .month-label {
+            flex: 1;
+            text-align: left;
+        }
+
+        .heatmap-grid {
+            display: flex;
+            gap: 3px;
+        }
+
+        .heatmap-week-column {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .heatmap-day-cell {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            background-color: var(--heatmap-level0);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .heatmap-day-cell:hover {
+            transform: scale(1.2);
+            outline: 1px solid var(--text-light);
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.7rem;
+            color: var(--text-light);
+        }
+
+        .legend-colors {
+            display: flex;
+            gap: 2px;
+            margin: 0 0.5rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .heatmap-day-labels {
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-size: 0.7rem;
+            color: var(--text-light);
+        }
+
+        .weekday-label {
+            height: 12px;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            font-size: 0.7rem;
+        }
+
+        .heatmap-header {
+            display: flex;
+            position: relative;
+            margin-left: 30px;
+        }
+
+        /* Tooltip for heatmap */
+        .heatmap-tooltip {
+            position: fixed;
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 2px 8px var(--shadow);
+            white-space: nowrap;
+        }
+
+        /* Task Breakdown */
+        .task-breakdown {
+            background-color: var(--card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .task-list {
+            margin-top: 1rem;
+        }
+
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .task-name {
+            font-weight: 500;
+            min-width: 150px;
+        }
+
+        .task-stats {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .task-time {
+            color: var(--primary);
+            font-weight: 500;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .task-percentage {
+            color: var(--text-light);
+            font-size: 0.85rem;
+            min-width: 60px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background-color: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-left: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* Insights */
+        .insights-card {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .insights-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .insights-list {
+            list-style: none;
+        }
+
+        .insights-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .insights-list li::before {
+            content: "💡";
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+            background-color: var(--card);
+            border-radius: 8px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                left: calc(var(--sidebar-width) * -1);
+                z-index: 1001;
+            }
+            
+            .sidebar.mobile-open {
+                left: 0;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .mobile-menu-btn {
+                position: fixed;
+                top: 1rem;
+                left: 1rem;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background-color: var(--primary);
+                color: white;
+                border: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                z-index: 1002;
+                box-shadow: 0 2px 4px var(--shadow);
+            }
+            
+            .overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1001;
+                display: none;
+            }
+            
+            .overlay.active {
+                display: block;
+            }
+
+            .heatmap-day-cell {
+                width: 10px;
+                height: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile menu button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+
+    <!-- Overlay for mobile menu -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">Focus Timer</span>
+            <button class="collapse-btn" id="collapseBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item" data-page="timer">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <span class="nav-text">Timer</span>
+            </li>
+            <li class="nav-item active" data-page="analytics">
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="2" y1="20" x2="22" y2="20"></line></svg>
+                </div>
+                <span class="nav-text">Analytics</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content" id="mainContent">
+        <div class="container">
+            <header>
+                <h1>Analytics Dashboard</h1>
+                <p class="subtitle">Track your productivity patterns and insights</p>
+                <div class="mode-toggle-container">
+                    <span class="mode-label">Light</span>
+                    <label class="mode-toggle">
+                        <input type="checkbox" id="modeToggle">
+                        <span class="mode-toggle-slider"></span>
+                    </label>
+                    <span class="mode-label">Dark</span>
+                </div>
+            </header>
+
+            <!-- Date Range Selector -->
+            <div class="daterange-container">
+                <div class="date-range-selector">
+                    <button class="range-btn" data-range="7">Last 7 days</button>
+                    <button class="range-btn" data-range="30">Last 30 days</button>
+                    <button class="range-btn" data-range="90">Last 90 days</button>
+                    <button class="range-btn" data-range="365">Last Year</button>
+                    <button class="range-btn" data-range="all">All Time</button>
+                    <div id="daterange">Select Date Range</div>
+                </div>
+                <button class="export-btn" id="exportBtn">📊 Export as CSV</button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value" id="totalTime">-</div>
+                    <div class="stat-sub" id="totalDays">over selected period</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Average Per Day</div>
+                    <div class="stat-value" id="avgPerDay">-</div>
+                    <div class="stat-sub">hours/day</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Most Productive Day</div>
+                    <div class="stat-value" id="bestDay">-</div>
+                    <div class="stat-sub" id="bestDayAmount">hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Tasks Tracked</div>
+                    <div class="stat-value" id="totalTasks">-</div>
+                    <div class="stat-sub">unique tasks</div>
+                </div>
+            </div>
+
+            <!-- GitHub-style Heatmap Card -->
+            <div class="chart-card" style="margin-bottom: 1.5rem;">
+                <div class="chart-title">Productivity Heatmap</div>
+                <div id="heatmapContainer">
+                    <div class="loading">Loading heatmap...</div>
+                </div>
+                <div class="heatmap-legend" id="heatmapLegend" style="display: none;">
+                    <span>Less</span>
+                    <div class="legend-colors">
+                        <div class="legend-color" style="background-color: var(--heatmap-level0)"></div>
+                        <div class="legend-color" style="background-color: var(--heatmap-level1)"></div>
+                        <div class="legend-color" style="background-color: var(--heatmap-level2)"></div>
+                        <div class="legend-color" style="background-color: var(--heatmap-level3)"></div>
+                        <div class="legend-color" style="background-color: var(--heatmap-level4)"></div>
+                    </div>
+                    <span>More</span>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Daily Time Distribution</div>
+                    <div class="chart-container">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Task Breakdown</div>
+                    <div class="chart-container">
+                        <canvas id="taskPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Weekly Trends (Last 8 Weeks)</div>
+                    <div class="chart-container">
+                        <canvas id="weeklyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Productivity by Day of Week</div>
+                    <div class="chart-container">
+                        <canvas id="dayOfWeekChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Breakdown -->
+            <div class="task-breakdown">
+                <div class="chart-title">Detailed Task Breakdown</div>
+                <div class="task-list" id="taskList">
+                    <div class="loading">Loading tasks...</div>
+                </div>
+            </div>
+
+            <!-- Insights -->
+            <div class="insights-card" id="insightsCard">
+                <div class="insights-title">✨ Insights & Recommendations</div>
+                <ul class="insights-list" id="insightsList">
+                    <li>Loading insights...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip for heatmap -->
+    <div id="heatmapTooltip" class="heatmap-tooltip" style="display: none;"></div>
+
+    <script>
+        // Firebase configuration - REPLACE WITH YOUR OWN CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "********",
+            authDomain: "********",
+            projectId: "********",
+            storageBucket: "********",
+            messagingSenderId: "********",
+            appId: "********",
+            measurementId: "********"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const dailyLogsCollection = db.collection('dailyLogs');
+
+        // Chart instances
+        let dailyChart = null;
+        let taskPieChart = null;
+        let weeklyChart = null;
+        let dayOfWeekChart = null;
+
+        // Current data range
+        let currentStartDate = null;
+        let currentEndDate = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const collapseBtn = document.getElementById('collapseBtn');
+            const navItems = document.querySelectorAll('.nav-item');
+            const modeToggle = document.getElementById('modeToggle');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const overlay = document.getElementById('overlay');
+            const exportBtn = document.getElementById('exportBtn');
+            
+            // Initialize date range picker
+            initializeDateRangePicker();
+            
+            // Setup event listeners for range buttons
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const range = this.getAttribute('data-range');
+                    setDateRange(range);
+                });
+            });
+            
+            // Export button
+            exportBtn.addEventListener('click', exportToCSV);
+            
+            // Theme toggle
+            const savedMode = localStorage.getItem('darkMode');
+            if (savedMode === 'true') {
+                document.body.classList.add('dark-mode');
+                modeToggle.checked = true;
+            }
+            
+            modeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('darkMode', 'true');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('darkMode', 'false');
+                }
+                // Reload heatmap to update colors
+                loadAnalyticsData();
+            });
+            
+            // Sidebar functionality
+            const savedCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (savedCollapsed === 'true' && window.innerWidth > 768) {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('sidebar-collapsed');
+            }
+            
+            collapseBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            });
+            
+            // Mobile menu
+            function updateMobileView() {
+                if (window.innerWidth <= 768) {
+                    mobileMenuBtn.style.display = 'flex';
+                    sidebar.classList.remove('collapsed');
+                    sidebar.style.left = `calc(var(--sidebar-width) * -1)`;
+                } else {
+                    mobileMenuBtn.style.display = 'none';
+                    overlay.style.display = 'none';
+                    sidebar.style.left = '0';
+                }
+            }
+            
+            updateMobileView();
+            window.addEventListener('resize', updateMobileView);
+            
+            mobileMenuBtn.addEventListener('click', function() {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+            });
+            
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+            });
+            
+            // Navigation
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const page = this.getAttribute('data-page');
+                    if (page === 'timer') {
+                        window.location.href = 'timers.html';
+                    }
+                });
+            });
+            
+            // Load initial data (last 30 days)
+            setDateRange('30');
+        });
+        
+        function initializeDateRangePicker() {
+            $('#daterange').daterangepicker({
+                opens: 'left',
+                locale: {
+                    format: 'YYYY-MM-DD'
+                }
+            }, function(start, end) {
+                currentStartDate = start.format('YYYY-MM-DD');
+                currentEndDate = end.format('YYYY-MM-DD');
+                loadAnalyticsData();
+            });
+        }
+        
+        function setDateRange(range) {
+            const end = new Date();
+            let start = new Date();
+            
+            switch(range) {
+                case '7':
+                    start.setDate(end.getDate() - 7);
+                    break;
+                case '30':
+                    start.setDate(end.getDate() - 30);
+                    break;
+                case '90':
+                    start.setDate(end.getDate() - 90);
+                    break;
+                case '365':
+                    start.setDate(end.getDate() - 365);
+                    break;
+                case 'all':
+                    start = new Date(2020, 0, 1);
+                    break;
+                default:
+                    start.setDate(end.getDate() - 30);
+            }
+            
+            currentStartDate = start.toISOString().slice(0, 10);
+            currentEndDate = end.toISOString().slice(0, 10);
+            
+            $('#daterange').data('daterangepicker').setStartDate(currentStartDate);
+            $('#daterange').data('daterangepicker').setEndDate(currentEndDate);
+            
+            loadAnalyticsData();
+        }
+        
+        async function loadAnalyticsData() {
+            try {
+                // Show loading states
+                document.getElementById('taskList').innerHTML = '<div class="loading">Loading tasks...</div>';
+                document.getElementById('heatmapContainer').innerHTML = '<div class="loading">Loading heatmap...</div>';
+                document.getElementById('heatmapLegend').style.display = 'none';
+                
+                // Query daily logs
+                let query = dailyLogsCollection.orderBy('date');
+                
+                if (currentStartDate && currentEndDate) {
+                    query = query.where('date', '>=', currentStartDate)
+                                 .where('date', '<=', currentEndDate);
+                }
+                
+                const snapshot = await query.get();
+                const logs = [];
+                
+                snapshot.forEach(doc => {
+                    logs.push(doc.data());
+                });
+                
+                if (logs.length === 0) {
+                    showNoData();
+                    return;
+                }
+                
+                // Process data
+                const processedData = processLogsData(logs);
+                
+                // Update UI
+                updateStatsCards(processedData);
+                updateDailyChart(processedData);
+                updateTaskPieChart(processedData);
+                updateWeeklyChart(processedData);
+                updateDayOfWeekChart(processedData);
+                updateGitHubStyleHeatmap(processedData);
+                updateTaskBreakdown(processedData);
+                updateInsights(processedData);
+                
+            } catch (error) {
+                console.error('Error loading analytics data:', error);
+                showError(error.message);
+            }
+        }
+        
+        function processLogsData(logs) {
+            // Sort by date
+            logs.sort((a, b) => a.date.localeCompare(b.date));
+            
+            // Create a map of date -> hours for quick lookup
+            const dateMap = new Map();
+            logs.forEach(log => {
+                dateMap.set(log.date, {
+                    totalSeconds: log.totalSeconds || 0,
+                    tasks: log.tasks || {}
+                });
+            });
+            
+            // Daily data array
+            const dailyData = logs.map(log => ({
+                date: log.date,
+                totalSeconds: log.totalSeconds || 0,
+                tasks: log.tasks || {}
+            }));
+            
+            // Task aggregation
+            const taskTotals = {};
+            const taskDailyCount = {};
+            
+            logs.forEach(log => {
+                const tasks = log.tasks || {};
+                Object.entries(tasks).forEach(([taskId, task]) => {
+                    const taskName = task.name;
+                    const taskTime = task.time || 0;
+                    
+                    if (!taskTotals[taskName]) {
+                        taskTotals[taskName] = 0;
+                        taskDailyCount[taskName] = 0;
+                    }
+                    taskTotals[taskName] += taskTime;
+                    if (taskTime > 0) taskDailyCount[taskName]++;
+                });
+            });
+            
+            // Weekly aggregation
+            const weeklyData = {};
+            logs.forEach(log => {
+                const date = new Date(log.date);
+                const weekNum = getWeekNumber(date);
+                const year = date.getFullYear();
+                const weekKey = `${year}-W${weekNum}`;
+                
+                if (!weeklyData[weekKey]) {
+                    weeklyData[weekKey] = {
+                        week: weekKey,
+                        totalSeconds: 0,
+                        days: 0
+                    };
+                }
+                weeklyData[weekKey].totalSeconds += (log.totalSeconds || 0);
+                weeklyData[weekKey].days++;
+            });
+            
+            const weeklyArray = Object.values(weeklyData);
+            weeklyArray.sort((a, b) => a.week.localeCompare(b.week));
+            
+            // Day of week aggregation
+            const dayOfWeekData = {
+                Sunday: { total: 0, count: 0 },
+                Monday: { total: 0, count: 0 },
+                Tuesday: { total: 0, count: 0 },
+                Wednesday: { total: 0, count: 0 },
+                Thursday: { total: 0, count: 0 },
+                Friday: { total: 0, count: 0 },
+                Saturday: { total: 0, count: 0 }
+            };
+            
+            logs.forEach(log => {
+                const date = new Date(log.date);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+                const hours = (log.totalSeconds || 0) / 3600;
+                dayOfWeekData[dayName].total += hours;
+                dayOfWeekData[dayName].count++;
+            });
+            
+            // Find best day
+            let bestDay = null;
+            let bestDaySeconds = 0;
+            logs.forEach(log => {
+                const seconds = log.totalSeconds || 0;
+                if (seconds > bestDaySeconds) {
+                    bestDaySeconds = seconds;
+                    bestDay = log.date;
+                }
+            });
+            
+            // Calculate total seconds
+            const totalSeconds = logs.reduce((sum, log) => sum + (log.totalSeconds || 0), 0);
+            const avgPerDay = totalSeconds / logs.length / 3600;
+            
+            return {
+                dailyData,
+                taskTotals,
+                taskDailyCount,
+                weeklyData: weeklyArray.slice(-8), // Last 8 weeks
+                dayOfWeekData,
+                dateMap,
+                bestDay,
+                bestDaySeconds,
+                totalSeconds,
+                avgPerDay,
+                totalDays: logs.length,
+                uniqueTasks: Object.keys(taskTotals).length,
+                logs
+            };
+        }
+        
+        function getWeekNumber(date) {
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+            const week1 = new Date(d.getFullYear(), 0, 4);
+            return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+        }
+        
+        function updateStatsCards(data) {
+            const formatHours = (seconds) => (seconds / 3600).toFixed(1);
+            
+            document.getElementById('totalTime').textContent = formatHours(data.totalSeconds) + 'h';
+            document.getElementById('totalDays').textContent = `over ${data.totalDays} day(s)`;
+            document.getElementById('avgPerDay').textContent = data.avgPerDay.toFixed(1);
+            document.getElementById('bestDay').textContent = data.bestDay || '-';
+            document.getElementById('bestDayAmount').textContent = data.bestDay ? formatHours(data.bestDaySeconds) + ' hours' : '';
+            document.getElementById('totalTasks').textContent = data.uniqueTasks;
+        }
+        
+        function updateDailyChart(data) {
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            const labels = data.dailyData.map(d => d.date);
+            const values = data.dailyData.map(d => d.totalSeconds / 3600);
+            
+            if (dailyChart) dailyChart.destroy();
+            
+            dailyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours',
+                        data: values,
+                        backgroundColor: 'rgba(74, 111, 165, 0.6)',
+                        borderColor: 'rgba(74, 111, 165, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `${context.raw.toFixed(1)} hours`
+                            }
+                        },
+                        legend: {
+                            labels: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text')
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Hours',
+                                color: getComputedStyle(document.body).getPropertyValue('--text-light')
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text')
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text'),
+                                maxRotation: 45,
+                                autoSkip: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTaskPieChart(data) {
+            const ctx = document.getElementById('taskPieChart').getContext('2d');
+            const tasks = Object.entries(data.taskTotals);
+            const labels = tasks.map(([name]) => name);
+            const values = tasks.map(([, seconds]) => seconds / 3600);
+            
+            if (taskPieChart) taskPieChart.destroy();
+            
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#FF6384', '#C9CBCF', '#4D5360', '#33FF57'
+            ];
+            
+            taskPieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const hours = context.raw;
+                                    const total = values.reduce((a, b) => a + b, 0);
+                                    const percentage = ((hours / total) * 100).toFixed(1);
+                                    return `${context.label}: ${hours.toFixed(1)} hours (${percentage}%)`;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text'),
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateWeeklyChart(data) {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            const labels = data.weeklyData.map(w => w.week);
+            const values = data.weeklyData.map(w => w.totalSeconds / 3600);
+            
+            if (weeklyChart) weeklyChart.destroy();
+            
+            weeklyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Hours per week',
+                        data: values,
+                        backgroundColor: 'rgba(74, 111, 165, 0.2)',
+                        borderColor: 'rgba(74, 111, 165, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: 'rgba(74, 111, 165, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `${context.raw.toFixed(1)} hours`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Hours',
+                                color: getComputedStyle(document.body).getPropertyValue('--text-light')
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text')
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text'),
+                                maxRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateDayOfWeekChart(data) {
+            const ctx = document.getElementById('dayOfWeekChart').getContext('2d');
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const averages = days.map(day => {
+                const dayData = data.dayOfWeekData[day];
+                return dayData.count > 0 ? (dayData.total / dayData.count).toFixed(1) : 0;
+            });
+            
+            if (dayOfWeekChart) dayOfWeekChart.destroy();
+            
+            dayOfWeekChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Average Hours',
+                        data: averages,
+                        backgroundColor: 'rgba(74, 111, 165, 0.6)',
+                        borderColor: 'rgba(74, 111, 165, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `${context.raw} hours average`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Hours',
+                                color: getComputedStyle(document.body).getPropertyValue('--text-light')
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text')
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text')
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateGitHubStyleHeatmap(data) {
+            // Get all dates in the range
+            const startDate = new Date(currentStartDate);
+            const endDate = new Date(currentEndDate);
+            
+            // Create a map of date -> hours
+            const dateMap = new Map();
+            data.logs.forEach(log => {
+                const hours = (log.totalSeconds || 0) / 3600;
+                dateMap.set(log.date, hours);
+            });
+            
+            // Find max hours for scaling (excluding zeros)
+            let maxHours = 0;
+            data.logs.forEach(log => {
+                const hours = (log.totalSeconds || 0) / 3600;
+                if (hours > maxHours) maxHours = hours;
+            });
+            
+            // Group by week (Sunday to Saturday for GitHub style)
+            // Find the first Sunday before or on start date
+            let firstDate = new Date(startDate);
+            const firstDayOfWeek = firstDate.getDay(); // 0 = Sunday
+            firstDate.setDate(firstDate.getDate() - firstDayOfWeek);
+            
+            // Generate all weeks
+            const weeks = [];
+            let weekStart = new Date(firstDate);
+            while (weekStart <= endDate) {
+                const week = [];
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(weekStart);
+                    date.setDate(weekStart.getDate() + i);
+                    const dateStr = date.toISOString().slice(0, 10);
+                    if (dateStr >= currentStartDate && dateStr <= currentEndDate) {
+                        const hours = dateMap.get(dateStr) || 0;
+                        week.push({
+                            date: dateStr,
+                            hours: hours,
+                            level: getHeatmapLevel(hours, maxHours)
+                        });
+                    } else {
+                        week.push(null);
+                    }
+                }
+                weeks.push(week);
+                weekStart.setDate(weekStart.getDate() + 7);
+            }
+            
+            // Month labels for the heatmap
+            const monthLabels = [];
+            let currentMonth = null;
+            weeks.forEach((week, index) => {
+                const firstValidDate = week.find(d => d && d.date);
+                if (firstValidDate) {
+                    const date = new Date(firstValidDate.date);
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                    if (monthName !== currentMonth) {
+                        monthLabels.push({ month: monthName, weekIndex: index });
+                        currentMonth = monthName;
+                    }
+                }
+            });
+            
+            // Build the heatmap HTML
+            const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            
+            let heatmapHTML = `
+                <div class="heatmap-wrapper">
+                    <div class="heatmap-header">
+                        <div class="heatmap-months" style="margin-left: 30px;">
+                            ${monthLabels.map((label, i) => {
+                                const nextIndex = monthLabels[i + 1]?.weekIndex || weeks.length;
+                                const width = (nextIndex - label.weekIndex) * 15;
+                                return `<div class="month-label" style="width: ${width}px;">${label.month}</div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <div style="display: flex; position: relative;">
+                        <div class="heatmap-day-labels" style="margin-top: 2px;">
+                            ${weekdayLabels.map((label, i) => `
+                                <div class="weekday-label" style="height: 15px; margin-bottom: 3px;">${label}</div>
+                            `).join('')}
+                        </div>
+                        <div class="heatmap-grid" style="margin-left: 30px;">
+                            ${weeks.map((week, weekIndex) => `
+                                <div class="heatmap-week-column">
+                                    ${week.map((day, dayIndex) => {
+                                        if (!day) {
+                                            return `<div class="heatmap-day-cell" style="opacity: 0;"></div>`;
+                                        }
+                                        const hoursFormatted = day.hours.toFixed(1);
+                                        const tooltipText = `${day.date}: ${hoursFormatted} hours`;
+                                        return `<div class="heatmap-day-cell" data-date="${day.date}" data-hours="${hoursFormatted}" data-level="${day.level}" 
+                                                    style="background-color: var(--heatmap-level${day.level})"
+                                                    onmouseenter="showHeatmapTooltip(event, '${tooltipText}')"
+                                                    onmouseleave="hideHeatmapTooltip()"></div>`;
+                                    }).join('')}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('heatmapContainer').innerHTML = heatmapHTML;
+            document.getElementById('heatmapLegend').style.display = 'flex';
+        }
+        
+        function getHeatmapLevel(hours, maxHours) {
+            if (hours === 0) return 0;
+            if (maxHours === 0) return 0;
+            
+            const ratio = hours / maxHours;
+            
+            if (ratio <= 0.25) return 1;
+            if (ratio <= 0.5) return 2;
+            if (ratio <= 0.75) return 3;
+            return 4;
+        }
+        
+        // Global tooltip functions
+        window.showHeatmapTooltip = function(event, text) {
+            const tooltip = document.getElementById('heatmapTooltip');
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.clientX + 10) + 'px';
+            tooltip.style.top = (event.clientY - 30) + 'px';
+            tooltip.innerHTML = text;
+        };
+        
+        window.hideHeatmapTooltip = function() {
+            const tooltip = document.getElementById('heatmapTooltip');
+            tooltip.style.display = 'none';
+        };
+        
+        function updateTaskBreakdown(data) {
+            const tasks = Object.entries(data.taskTotals);
+            const totalSeconds = data.totalSeconds;
+            
+            tasks.sort((a, b) => b[1] - a[1]);
+            
+            const taskListHTML = tasks.map(([taskName, seconds]) => {
+                const hours = (seconds / 3600).toFixed(1);
+                const percentage = ((seconds / totalSeconds) * 100).toFixed(1);
+                const dailyCount = data.taskDailyCount[taskName] || 0;
+                
+                return `
+                    <div class="task-item">
+                        <div class="task-name">${escapeHtml(taskName)}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="task-stats">
+                            <span class="task-time">${hours}h</span>
+                            <span class="task-percentage">(${percentage}%)</span>
+                            <span class="task-percentage">📅 ${dailyCount} days</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('taskList').innerHTML = taskListHTML || '<div class="loading">No tasks found</div>';
+        }
+        
+        function updateInsights(data) {
+            const insights = [];
+            const avgPerDay = data.avgPerDay;
+            const bestDayHours = data.bestDaySeconds / 3600;
+            
+            // Productivity insights
+            if (avgPerDay < 2) {
+                insights.push('Your average daily productivity is below 2 hours. Try breaking tasks into smaller, manageable chunks.');
+            } else if (avgPerDay > 8) {
+                insights.push('Great work! You\'re putting in significant hours. Remember to take regular breaks to avoid burnout.');
+            } else {
+                insights.push(`You're averaging ${avgPerDay.toFixed(1)} hours per day. Keep up the consistent pace!`);
+            }
+            
+            // Best day insight
+            if (data.bestDay) {
+                insights.push(`Your most productive day was ${data.bestDay} with ${bestDayHours.toFixed(1)} hours of focused work.`);
+            }
+            
+            // Task variety insight
+            if (data.uniqueTasks > 10) {
+                insights.push(`You're juggling ${data.uniqueTasks} different tasks. Consider grouping similar tasks to reduce context switching.`);
+            } else if (data.uniqueTasks < 3) {
+                insights.push(`You focus on a small number of tasks. Great for deep work! Consider tracking more specific subtasks for better insights.`);
+            }
+            
+            // Top task insight
+            const topTask = Object.entries(data.taskTotals).sort((a, b) => b[1] - a[1])[0];
+            if (topTask) {
+                const topTaskHours = (topTask[1] / 3600).toFixed(1);
+                insights.push(`Your top task is "${topTask[0]}" with ${topTaskHours} hours tracked.`);
+            }
+            
+            // Day of week insight
+            let bestDayName = '';
+            let bestDayAvg = 0;
+            Object.entries(data.dayOfWeekData).forEach(([day, stats]) => {
+                const avg = stats.count > 0 ? stats.total / stats.count : 0;
+                if (avg > bestDayAvg) {
+                    bestDayAvg = avg;
+                    bestDayName = day;
+                }
+            });
+            if (bestDayName) {
+                insights.push(`Your most productive day of the week is ${bestDayName} with an average of ${bestDayAvg.toFixed(1)} hours.`);
+            }
+            
+            // Consistency insight
+            const productiveDays = data.logs.filter(log => (log.totalSeconds || 0) > 3600).length;
+            const consistency = (productiveDays / data.totalDays * 100).toFixed(0);
+            if (consistency > 70) {
+                insights.push(`🎉 You're extremely consistent! You had productive days ${consistency}% of the time.`);
+            } else if (consistency < 30) {
+                insights.push(`Try to build a daily routine. You were productive only ${consistency}% of days in this period.`);
+            }
+            
+            const insightsHTML = insights.map(insight => `<li>${insight}</li>`).join('');
+            document.getElementById('insightsList').innerHTML = insightsHTML;
+        }
+        
+        function showNoData() {
+            const noDataHTML = '<div class="no-data">📊 No data available for the selected period. Start tracking your time to see analytics!</div>';
+            document.getElementById('taskList').innerHTML = noDataHTML;
+            document.getElementById('heatmapContainer').innerHTML = noDataHTML;
+            document.getElementById('heatmapLegend').style.display = 'none';
+            document.getElementById('insightsList').innerHTML = '<li>Start tracking your time to get personalized insights!</li>';
+            
+            // Clear charts
+            ['dailyChart', 'taskPieChart', 'weeklyChart', 'dayOfWeekChart'].forEach(chartId => {
+                const ctx = document.getElementById(chartId)?.getContext('2d');
+                if (ctx) {
+                    if (chartId === 'dailyChart' && dailyChart) dailyChart.destroy();
+                    if (chartId === 'taskPieChart' && taskPieChart) taskPieChart.destroy();
+                    if (chartId === 'weeklyChart' && weeklyChart) weeklyChart.destroy();
+                    if (chartId === 'dayOfWeekChart' && dayOfWeekChart) dayOfWeekChart.destroy();
+                }
+            });
+        }
+        
+        function showError(message) {
+            const errorHTML = `<div class="no-data">⚠️ Error loading data: ${message}</div>`;
+            document.getElementById('taskList').innerHTML = errorHTML;
+            document.getElementById('heatmapContainer').innerHTML = errorHTML;
+            document.getElementById('heatmapLegend').style.display = 'none';
+        }
+        
+        async function exportToCSV() {
+            try {
+                const snapshot = await dailyLogsCollection
+                    .where('date', '>=', currentStartDate)
+                    .where('date', '<=', currentEndDate)
+                    .orderBy('date')
+                    .get();
+                
+                const logs = [];
+                snapshot.forEach(doc => logs.push(doc.data()));
+                
+                if (logs.length === 0) {
+                    alert('No data to export');
+                    return;
+                }
+                
+                // Prepare CSV data
+                const csvRows = [['Date', 'Total Hours', 'Task Breakdown']];
+                
+                logs.forEach(log => {
+                    const taskBreakdown = Object.entries(log.tasks || {})
+                        .map(([, task]) => `${task.name}: ${(task.time / 3600).toFixed(2)}h`)
+                        .join('; ');
+                    
+                    csvRows.push([
+                        log.date,
+                        ((log.totalSeconds || 0) / 3600).toFixed(2),
+                        taskBreakdown
+                    ]);
+                });
+                
+                // Also add task summary
+                csvRows.push([]);
+                csvRows.push(['Task Summary', 'Total Hours', '']);
+                
+                const taskTotals = {};
+                logs.forEach(log => {
+                    Object.entries(log.tasks || {}).forEach(([, task]) => {
+                        if (!taskTotals[task.name]) taskTotals[task.name] = 0;
+                        taskTotals[task.name] += task.time;
+                    });
+                });
+                
+                Object.entries(taskTotals).forEach(([name, seconds]) => {
+                    csvRows.push([name, (seconds / 3600).toFixed(2), '']);
+                });
+                
+                // Download CSV
+                const csvContent = csvRows.map(row => row.join(',')).join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `focus_timer_analytics_${currentStartDate}_to_${currentEndDate}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error exporting data:', error);
+                alert('Failed to export data');
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
