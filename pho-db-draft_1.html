@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Physics Olympiad Hub | Browse Questions</title>
+    <!-- Tailwind CSS v3 + Google Fonts + Font Awesome Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        body {
+            background: #f8fafc;
+        }
+        /* custom smooth transitions */
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
+        }
+        .filter-active {
+            background-color: #1e40af;
+            color: white;
+            border-color: #1e40af;
+        }
+        .badge {
+            transition: all 0.15s;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- React & ReactDOM & Babel (for JSX) -->
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+    // ----------------------------- SAMPLE DATABASE ---------------------------------
+    // Rich set of physics olympiad questions covering various competitions, difficulties, topics.
+    const questionsDB = [
+        { id: 1, competition: "IPhO", difficulty: "Hard", topic: "Mechanics", title: "Rolling Spool on Incline", text: "A spool of mass M and moment of inertia I rolls without slipping on an inclined plane. Find acceleration of its center of mass.", year: 2019 },
+        { id: 2, competition: "IPhO", difficulty: "Hard", topic: "Thermodynamics", title: "Carnot Cycle with Real Gas", text: "Analyze efficiency of a Carnot engine using van der Waals gas. Derive expression for work done.", year: 2020 },
+        { id: 3, competition: "IPhO", difficulty: "Medium", topic: "Electromagnetism", title: "Charged Ring Oscillations", text: "A charged particle moves along axis of a uniformly charged ring. Find frequency of small oscillations.", year: 2018 },
+        { id: 4, competition: "JPhO", difficulty: "Easy", topic: "Optics", title: "Refraction in Prism", text: "A ray enters a prism of refractive index 1.5 at grazing incidence. Find deviation angle.", year: 2021 },
+        { id: 5, competition: "USAPhO", difficulty: "Hard", topic: "Modern Physics", title: "Photoelectric Effect Threshold", text: "When light of wavelength 200 nm hits a metal, stopping potential is 2V. Find work function.", year: 2017 },
+        { id: 6, competition: "JPhO", difficulty: "Medium", topic: "Mechanics", title: "Pulley System Dynamics", text: "Two masses connected by string over pulley, one on rough table. Find acceleration.", year: 2020 },
+        { id: 7, competition: "USAPhO", difficulty: "Medium", topic: "Electromagnetism", title: "RC Circuit Transient", text: "Capacitor initially charged, discharges through resistor R. Derive voltage decay.", year: 2019 },
+        { id: 8, competition: "IPhO", difficulty: "Hard", topic: "Optics", title: "Diffraction Grating Resolution", text: "A grating with 600 lines/mm is used to resolve sodium doublet. Find minimum width.", year: 2016 },
+        { id: 9, competition: "JPhO", difficulty: "Easy", topic: "Thermodynamics", title: "Ideal Gas Expansion", text: "One mole of ideal gas expands isothermally from V1 to V2. Compute heat absorbed.", year: 2022 },
+        { id: 10, competition: "USAPhO", difficulty: "Hard", topic: "Modern Physics", title: "Bohr Model for Muonic Atom", text: "Muon replaces electron in hydrogen. Find ground state energy and radius.", year: 2021 },
+        { id: 11, competition: "IPhO", difficulty: "Medium", topic: "Electromagnetism", title: "Magnetic Field of Solenoid", text: "Long solenoid with n turns per meter carries current I. Find field inside and inductance per unit length.", year: 2015 },
+        { id: 12, competition: "JPhO", difficulty: "Easy", topic: "Mechanics", title: "Projectile on Incline", text: "Projectile launched from incline hits incline again. Find range along incline.", year: 2019 },
+        { id: 13, competition: "USAPhO", difficulty: "Medium", topic: "Thermodynamics", title: "Entropy Change of Mixing", text: "Two gases separated by partition, after removal find entropy change.", year: 2020 },
+        { id: 14, competition: "IPhO", difficulty: "Hard", topic: "Modern Physics", title: "Relativistic Doppler Shift", text: "A star moving away emits light of wavelength λ0. Observed wavelength shift formula.", year: 2017 },
+        { id: 15, competition: "USAPhO", difficulty: "Easy", topic: "Optics", title: "Mirror Magnification", text: "An object placed 20cm from concave mirror (f=15cm). Find image position and magnification.", year: 2018 }
+    ];
+
+    // Extract unique filter options from dataset
+    const allCompetitions = [...new Set(questionsDB.map(q => q.competition))].sort();
+    const allDifficulties = [...new Set(questionsDB.map(q => q.difficulty))].sort((a,b) => {
+        const order = { "Easy": 1, "Medium": 2, "Hard": 3 };
+        return order[a] - order[b];
+    });
+    const allTopics = [...new Set(questionsDB.map(q => q.topic))].sort();
+
+    // ---------------------------- MAIN APP COMPONENT -------------------------------
+    const PhysicsQuestionBrowser = () => {
+        // Filter states
+        const [selectedCompetitions, setSelectedCompetitions] = React.useState([]);
+        const [selectedDifficulties, setSelectedDifficulties] = React.useState([]);
+        const [selectedTopics, setSelectedTopics] = React.useState([]);
+        const [searchQuery, setSearchQuery] = React.useState("");
+        
+        // Helper: toggle array selection
+        const toggleFilter = (value, currentArray, setArray) => {
+            if (currentArray.includes(value)) {
+                setArray(currentArray.filter(v => v !== value));
+            } else {
+                setArray([...currentArray, value]);
+            }
+        };
+        
+        // Reset all filters
+        const clearFilters = () => {
+            setSelectedCompetitions([]);
+            setSelectedDifficulties([]);
+            setSelectedTopics([]);
+            setSearchQuery("");
+        };
+        
+        // Filter logic
+        const filteredQuestions = React.useMemo(() => {
+            let results = [...questionsDB];
+            
+            // Filter by competition
+            if (selectedCompetitions.length > 0) {
+                results = results.filter(q => selectedCompetitions.includes(q.competition));
+            }
+            // Filter by difficulty
+            if (selectedDifficulties.length > 0) {
+                results = results.filter(q => selectedDifficulties.includes(q.difficulty));
+            }
+            // Filter by topic
+            if (selectedTopics.length > 0) {
+                results = results.filter(q => selectedTopics.includes(q.topic));
+            }
+            // Text search (title & text)
+            if (searchQuery.trim() !== "") {
+                const lowerQuery = searchQuery.toLowerCase();
+                results = results.filter(q => 
+                    q.title.toLowerCase().includes(lowerQuery) || 
+                    q.text.toLowerCase().includes(lowerQuery)
+                );
+            }
+            return results;
+        }, [selectedCompetitions, selectedDifficulties, selectedTopics, searchQuery]);
+        
+        // Helper for active filter badge removal
+        const activeFiltersCount = selectedCompetitions.length + selectedDifficulties.length + selectedTopics.length + (searchQuery !== "" ? 1 : 0);
+        
+        // Difficulty color mapper
+        const getDifficultyColor = (difficulty) => {
+            if (difficulty === "Easy") return "bg-green-100 text-green-800 border-green-200";
+            if (difficulty === "Medium") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+            return "bg-red-100 text-red-800 border-red-200";
+        };
+        
+        // Competition badge style
+        const getCompColor = (comp) => {
+            if (comp === "IPhO") return "bg-indigo-100 text-indigo-800";
+            if (comp === "USAPhO") return "bg-blue-100 text-blue-800";
+            return "bg-emerald-100 text-emerald-800";
+        };
+        
+        // Component for filter section
+        const FilterGroup = ({ title, items, selectedItems, onToggle, iconClass }) => (
+            <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3 text-gray-700 font-semibold text-sm uppercase tracking-wide">
+                    <i className={`${iconClass} text-slate-500`}></i>
+                    <span>{title}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {items.map(item => (
+                        <button
+                            key={item}
+                            onClick={() => onToggle(item)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all shadow-sm border
+                                ${selectedItems.includes(item) 
+                                    ? 'filter-active border-blue-700 bg-blue-800 text-white' 
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                                }`}
+                        >
+                            {item}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+        
+        // Question card component
+        const QuestionCard = ({ question }) => (
+            <div className="card-hover bg-white rounded-xl shadow-md border border-gray-100 p-5 flex flex-col h-full transition duration-200">
+                <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
+                    <div className="flex gap-2 flex-wrap">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCompColor(question.competition)}`}>
+                            {question.competition}
+                        </span>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getDifficultyColor(question.difficulty)}`}>
+                            {question.difficulty}
+                        </span>
+                    </div>
+                    {question.year && <span className="text-xs text-gray-400 font-mono">{question.year}</span>}
+                </div>
+                <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-1">{question.title}</h3>
+                <div className="flex items-center gap-1 mb-3 text-sm text-blue-600">
+                    <i className="fas fa-tag text-xs"></i>
+                    <span className="font-medium">{question.topic}</span>
+                </div>
+                <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">{question.text}</p>
+                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                    <button className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
+                        <i className="far fa-eye"></i> View details
+                    </button>
+                </div>
+            </div>
+        );
+        
+        return (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Header Section */}
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-600">
+                            Physics Olympiad Hub
+                        </span>
+                    </h1>
+                    <p className="mt-3 max-w-2xl mx-auto text-gray-500 text-lg">
+                        Explore challenging problems from IPhO, USAPhO, JPhO — by topic, difficulty & competition
+                    </p>
+                </div>
+                
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* SIDEBAR FILTERS */}
+                    <aside className="lg:w-80 w-full bg-white rounded-2xl shadow-sm p-5 h-fit border border-gray-100 sticky top-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                                <i className="fas fa-sliders-h text-indigo-500"></i> Filters
+                            </h2>
+                            {activeFiltersCount > 0 && (
+                                <button 
+                                    onClick={clearFilters}
+                                    className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 transition"
+                                >
+                                    <i className="fas fa-undo-alt"></i> Reset all
+                                </button>
+                            )}
+                        </div>
+                        
+                        {/* Search Input */}
+                        <div className="mb-6">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                                <i className="fas fa-search text-slate-400"></i> Search
+                            </label>
+                            <div className="relative">
+                                <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                                <input
+                                    type="text"
+                                    placeholder="Title or problem text..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none transition"
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* Filter Groups */}
+                        <FilterGroup 
+                            title="Competition" 
+                            items={allCompetitions} 
+                            selectedItems={selectedCompetitions}
+                            onToggle={(val) => toggleFilter(val, selectedCompetitions, setSelectedCompetitions)}
+                            iconClass="fas fa-trophy"
+                        />
+                        <FilterGroup 
+                            title="Difficulty" 
+                            items={allDifficulties} 
+                            selectedItems={selectedDifficulties}
+                            onToggle={(val) => toggleFilter(val, selectedDifficulties, setSelectedDifficulties)}
+                            iconClass="fas fa-chart-line"
+                        />
+                        <FilterGroup 
+                            title="Topic" 
+                            items={allTopics} 
+                            selectedItems={selectedTopics}
+                            onToggle={(val) => toggleFilter(val, selectedTopics, setSelectedTopics)}
+                            iconClass="fas fa-atom"
+                        />
+                        
+                        <div className="mt-4 pt-3 text-xs text-gray-400 flex justify-between border-t border-gray-100">
+                            <span><i className="far fa-database mr-1"></i>{questionsDB.length} total problems</span>
+                            <span><i className="far fa-filter"></i> {filteredQuestions.length} shown</span>
+                        </div>
+                    </aside>
+                    
+                    {/* MAIN CONTENT: RESULTS GRID */}
+                    <main className="flex-1">
+                        {/* Result header + active filter badges */}
+                        <div className="mb-5 flex flex-wrap justify-between items-center gap-3">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                    <i className="fas fa-layer-group text-indigo-500"></i> 
+                                    Questions
+                                    <span className="text-sm font-normal bg-gray-200 text-gray-700 px-2.5 py-0.5 rounded-full ml-2">
+                                        {filteredQuestions.length}
+                                    </span>
+                                </h2>
+                            </div>
+                            {activeFiltersCount > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedCompetitions.map(comp => (
+                                        <span key={comp} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs px-2 py-1 rounded-full border border-indigo-200">
+                                            {comp} <button onClick={() => toggleFilter(comp, selectedCompetitions, setSelectedCompetitions)}><i className="fas fa-times-circle text-xs ml-1 hover:text-indigo-900"></i></button>
+                                        </span>
+                                    ))}
+                                    {selectedDifficulties.map(diff => (
+                                        <span key={diff} className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 text-xs px-2 py-1 rounded-full border border-orange-200">
+                                            {diff} <button onClick={() => toggleFilter(diff, selectedDifficulties, setSelectedDifficulties)}><i className="fas fa-times-circle text-xs ml-1"></i></button>
+                                        </span>
+                                    ))}
+                                    {selectedTopics.map(topic => (
+                                        <span key={topic} className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full border border-green-200">
+                                            {topic} <button onClick={() => toggleFilter(topic, selectedTopics, setSelectedTopics)}><i className="fas fa-times-circle text-xs ml-1"></i></button>
+                                        </span>
+                                    ))}
+                                    {searchQuery && (
+                                        <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full border border-gray-300">
+                                            “{searchQuery}” <button onClick={() => setSearchQuery("")}><i className="fas fa-times-circle text-xs ml-1"></i></button>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {filteredQuestions.length === 0 ? (
+                            <div className="bg-white rounded-2xl shadow-sm p-12 text-center border border-dashed border-gray-300">
+                                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 text-gray-400 mb-4">
+                                    <i className="fas fa-search text-3xl"></i>
+                                </div>
+                                <h3 className="text-xl font-medium text-gray-700 mb-1">No matching questions</h3>
+                                <p className="text-gray-500">Try adjusting your filters or search term.</p>
+                                <button onClick={clearFilters} className="mt-4 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition text-sm font-medium">
+                                    Clear all filters
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {filteredQuestions.map(question => (
+                                    <QuestionCard key={question.id} question={question} />
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* subtle pagination info (no actual pagination for demo simplicity) */}
+                        {filteredQuestions.length > 0 && (
+                            <div className="mt-10 text-center text-sm text-gray-400 border-t pt-6">
+                                <i className="fas fa-arrow-down mr-1"></i> Scroll for more — {filteredQuestions.length} problem{filteredQuestions.length !== 1 ? 's' : ''} loaded
+                            </div>
+                        )}
+                    </main>
+                </div>
+                {/* Footer note */}
+                <div className="mt-12 text-center text-xs text-gray-400 border-t pt-6">
+                    <i className="far fa-copyright"></i> Sample database — real olympiad problems for demonstration. Built with React & Tailwind.
+                </div>
+            </div>
+        );
+    };
+    
+    // Render to root
+    ReactDOM.createRoot(document.getElementById("root")).render(<PhysicsQuestionBrowser />);
+</script>
+</body>
+</html>
